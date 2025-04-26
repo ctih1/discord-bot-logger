@@ -1,0 +1,13 @@
+[package]
+name = "discord-time"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+dotenv = "0.15.0"
+libsql = "0.9.5"
+poise = "0.6.1"
+serenity = "0.12.4"
+tokio = { version = "1.21.2", features = ["macros", "rt-multi-thread"] }
+log = "0.4"
+mpsc = "0.2.5"
