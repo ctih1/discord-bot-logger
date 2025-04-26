@@ -1,0 +1,79 @@
+name: Cross-Platform Rust Build & Release
+
+on:
+  push:
+    branches:
+        - master
+
+jobs:
+  build-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          profile: minimal
+          override: true
+
+      - name: Build for Linux
+        run: cargo build --release
+
+      - name: Upload Linux binary
+        uses: softprops/action-gh-release@v2
+        with:
+          files: target/release/discord-time
+          name: discord-time-linux
+    env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          profile: minimal
+          override: true
+
+      - name: Build for Windows
+        run: cargo build --release
+
+      - name: Upload Windows binary
+        uses: softprops/action-gh-release@v2
+        with:
+          files: target\release\discord-time.exe
+          name: discord-time-windows.exe
+    env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  build-macos:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          profile: minimal
+          override: true
+
+      - name: Build for MacOS
+        run: cargo build --release
+
+      - name: Upload MacOS binary
+        uses: softprops/action-gh-release@v2
+        with:
+          files: target/release/discord-time
+          name: discord-time-macos
+    env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
