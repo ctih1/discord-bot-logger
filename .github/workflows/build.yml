@@ -1,9 +1,9 @@
-name: Cross-Platform Rust Build & Release
+name: Cross-Platform Rust Build & Upload Artifacts
 
 on:
   push:
     branches:
-        - master
+      - master
 
 jobs:
   build-linux:
@@ -22,13 +22,11 @@ jobs:
       - name: Build for Linux
         run: cargo build --release
 
-      - name: Upload Linux binary
-        uses: softprops/action-gh-release@v2
+      - name: Upload Linux binary as artifact
+        uses: actions/upload-artifact@v4
         with:
-          files: target/release/discord-time
           name: discord-time-linux
-    env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          path: target/release/discord-time
 
   build-windows:
     runs-on: windows-latest
@@ -46,13 +44,11 @@ jobs:
       - name: Build for Windows
         run: cargo build --release
 
-      - name: Upload Windows binary
-        uses: softprops/action-gh-release@v2
+      - name: Upload Windows binary as artifact
+        uses: actions/upload-artifact@v4
         with:
-          files: target\release\discord-time.exe
-          name: discord-time-windows.exe
-    env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          name: discord-time-windows
+          path: target\release\discord-time.exe
 
   build-macos:
     runs-on: macos-latest
@@ -70,10 +66,8 @@ jobs:
       - name: Build for MacOS
         run: cargo build --release
 
-      - name: Upload MacOS binary
-        uses: softprops/action-gh-release@v2
+      - name: Upload MacOS binary as artifact
+        uses: actions/upload-artifact@v4
         with:
-          files: target/release/discord-time
           name: discord-time-macos
-    env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          path: target/release/discord-time
