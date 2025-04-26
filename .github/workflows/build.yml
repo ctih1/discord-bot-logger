@@ -1,4 +1,4 @@
-name: Cross-Platform Rust Build & Upload Artifacts
+name: Cross-Platform Rust Build & Upload Artifacts with Cache
 
 on:
   push:
@@ -12,12 +12,23 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup Rust
+      - name: Set up Rust
         uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
           profile: minimal
           override: true
+
+      - name: Cache Cargo registry and target directory
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
 
       - name: Build for Linux
         run: cargo build --release
@@ -34,12 +45,23 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup Rust
+      - name: Set up Rust
         uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
           profile: minimal
           override: true
+
+      - name: Cache Cargo registry and target directory
+        uses: actions/cache@v3
+        with:
+          path: |
+            C:\Users\runneradmin\.cargo\registry
+            C:\Users\runneradmin\.cargo\git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
 
       - name: Build for Windows
         run: cargo build --release
@@ -56,12 +78,23 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup Rust
+      - name: Set up Rust
         uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
           profile: minimal
           override: true
+
+      - name: Cache Cargo registry and target directory
+        uses: actions/cache@v3
+        with:
+          path: |
+            /Users/runner/Library/Caches/cargo/registry
+            /Users/runner/Library/Caches/cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
 
       - name: Build for MacOS
         run: cargo build --release
