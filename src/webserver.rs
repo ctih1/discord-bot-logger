@@ -19,9 +19,9 @@ struct DatabaseTarget {
 #[allow(unreachable_code)]
 
 pub fn main() {
-    println!("Now listening on localhost:8000");
+    println!("Now listening on 0.0.0.0:8000");
 
-    rouille::start_server("localhost:8000", move |request| {
+    rouille::start_server("0.0.0.0:8000", move |request| {
         router!(request,
             (GET) (/) => {
                 let cookies = parse_cookies(request);
