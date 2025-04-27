@@ -33,8 +33,8 @@ impl EventHandler for Handler {
     }
 
     async fn presence_update(&self, _ctx: serenity::Context, new_data: Presence) {
-        if !new_data.guild_id.unwrap().get().to_string().eq(&env::var("SCAN_GUILD").unwrap()) {
-            println!("Ignoring status update.");
+        if &new_data.guild_id.unwrap().get().to_string() != (&env::var("SCAN_GUILD").unwrap()) {
+            println!("Ignoring status update. Wrong guild {}", &new_data.guild_id.unwrap().get().to_string());
         }
 
         println!("Presence update for {} arrived", new_data.user.name.unwrap());
