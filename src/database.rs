@@ -71,6 +71,7 @@ pub async fn writer_task(mut rx: Receiver<WriteJob>) {
     ").as_str(), ()).await.unwrap();
 
     while let Some(job) = rx.recv().await {
+        println!("Performing write job");
         let result: Result<u64, libsql::Error> = conn.execute(
             "INSERT INTO tracking_data (user_id, time, status, activity, activity_description) VALUES (?1, ?2, ?3, ?4, ?5)",
             (job.user_id, job.time, job.status, job.activity, job.activity_description)
