@@ -1,5 +1,5 @@
-use std::fs::File;
-use libsql::Builder;
+use std::{collections::HashMap, fs::File};
+use libsql::{Builder, Row};
 use log::{info, error};
 use tokio::sync::mpsc::{Sender, Receiver, channel};
 
@@ -14,6 +14,50 @@ pub struct WriteJob {
 
 pub fn new_write_queue(buffer: usize) -> (Sender<WriteJob>, Receiver<WriteJob>) {
     channel(buffer)
+}
+
+pub async fn associate_usermame(id: u64, name: &str) {
+    println!("Associating user {id} with username {name}");
+
+    let db = Builder::new_local("data.db").build().await.unwrap();
+    let conn = db.connect().unwrap();
+    
+    conn.execute(format!("
+    CREATE TABLE IF NOT EXISTS users (
+        id                      INTEGER PRIMARY KEY,
+        username                MEDIUMTEXT
+    )
+    ").as_str(), ()).await.unwrap();
+
+    let result: Result<u64, libsql::Error> = conn.execute(
+        "INSERT OR REPLACE INTO users (id, username) VALUES (?1, ?2)",
+        (id, name)
+    ).await;
+} 
+
+pub async fn get_usernames(ids: Vec<u64>) -> HashMap<u64,String> {
+    let db = Builder::new_local("data.db").build().await.unwrap();
+    let conn = db.connect().unwrap();
+
+    let mut results: HashMap<u64, String> = HashMap::new();
+
+    conn.execute(format!("
+    CREATE TABLE IF NOT EXISTS users (
+        id                      INTEGER PRIMARY KEY,
+        username                MEDIUMTEXT
+    )
+    ").as_str(), ()).await.unwrap();
+
+    for id in ids.iter() {
+        let mut query = conn.query(&format!("SELECT username FROM users WHERE id = {id}").as_str(),()).await.unwrap();
+        if let Some(row) = query.next().await.unwrap() {
+            results.insert(*id, row.get(0).unwrap());
+        } else {
+            println!("Could not find value for {id}");
+            results.insert(*id, "unknown-user".to_string());
+        }
+    }
+    return results
 }
 
 pub async fn get_data(page: &u64, user_id: Option<&str>, status: Option<&str>, activity: Option<&str>, activity_description: Option<&str>, time_lt: Option<&u64>, time_mt: Option<&u64>) -> libsql::Rows {

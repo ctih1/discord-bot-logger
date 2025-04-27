@@ -12,7 +12,9 @@ use tokio::sync::mpsc::Sender;
 use rand::{distr::Alphanumeric, Rng};
 use std::thread;
 
-struct Data {}
+struct Data {
+    key: String
+}
 
 struct Handler {
     tx:Sender<database::WriteJob>
@@ -36,9 +38,12 @@ impl EventHandler for Handler {
         if &new_data.guild_id.unwrap().get().to_string() != (&env::var("SCAN_GUILD").unwrap()) {
             println!("Ignoring status update. Wrong guild {}", &new_data.guild_id.unwrap().get().to_string());
             return;
-        } 
+        }
 
-        println!("Presence update for {} arrived", new_data.user.name.unwrap());
+        let username =  &new_data.user.name.unwrap();
+        println!("Presence update for {} arrived", username);
+
+        database::associate_usermame(new_data.user.id.get(),username).await;
         
         let activity = new_data
             .activities
@@ -78,17 +83,7 @@ async fn login(ctx: Context<'_>) -> Result<(), Error> {
         return Ok(())
     }
 
-    let key: String = rand::rng()
-        .sample_iter(&Alphanumeric)
-        .take(16)
-        .map(char::from)
-        .collect();
-
-    unsafe {
-        env::set_var("key", &key);
-    }
-    
-    ctx.say(format!("{}", &key)).await?;
+    ctx.say(format!("{}", ctx.data().key)).await?;
 
     Ok(())
 }
@@ -105,8 +100,20 @@ async fn main() {
     };
 
     let token = env::var("BOT_TOKEN").expect("Expected a token in the environment");
-    
+    let key: Arc<String> = Arc::new(rand::rng()
+        .sample_iter(&Alphanumeric)
+        .take(16)
+        .map(char::from)
+        .collect());
+
+    let key_copy = Arc::clone(&key);
+
     let intents: GatewayIntents = GatewayIntents::GUILD_MESSAGES | GatewayIntents::MESSAGE_CONTENT | GatewayIntents::GUILDS | GatewayIntents::GUILD_MEMBERS | GatewayIntents::GUILD_PRESENCES;
+
+
+
+    thread::spawn(move || webserver::main(key_copy.to_string()));
+
 
     let framework = poise::Framework::builder()
         .options(poise::FrameworkOptions {
@@ -116,12 +123,14 @@ async fn main() {
         .setup(|ctx, _ready, framework| {
             Box::pin(async move {
                 poise::builtins::register_globally(ctx, &framework.options().commands).await?;
-                Ok(Data {})
+                Ok(Data {
+                    key: Arc::clone(&key).to_string()
+                })
             })
         })
         .build(); 
 
-    thread::spawn(||webserver::main());
+    
 
     let client = ClientBuilder::new(token,intents)
         .event_handler(handler)

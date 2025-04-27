@@ -6,6 +6,7 @@ use std::fs;
 use std::env;
 use crate::database;
 use crate::futures::executor;
+use chrono::prelude::{DateTime};
 
 struct DatabaseTarget {
     id: u64,
@@ -18,7 +19,8 @@ struct DatabaseTarget {
 
 #[allow(unreachable_code)]
 
-pub fn main() {
+pub fn main(key: String) {
+    let key: String = key;
     println!("Now listening on 0.0.0.0:8000");
 
     rouille::start_server("0.0.0.0:8000", move |request| {
@@ -26,25 +28,14 @@ pub fn main() {
             (GET) (/) => {
                 let cookies = parse_cookies(request);
 
-                let mut key_is_defined = true;
-
-                env::var("key").unwrap_or_else(|_| {
-                    key_is_defined = false;
-                    return "".to_string();
-                });
-
-                if !key_is_defined {
-                    println!("Key is not defined in env. Redirecting to login");
-                    return rouille::Response::redirect_302("/login#not-defined");
-                }
-                
                 if let Some(auth_token) = cookies.get("Authorization") {
-                    if auth_token != &env::var("key").unwrap() {
+                    if auth_token != &key {
                         return rouille::Response::redirect_302("/login#invalid");
                     } 
                 } else {
                     return rouille::Response::redirect_302("/login#not-specified");
                 }
+                
                 
                 
                 let page_number: u64 = cookies.get("page").unwrap_or(&String::from("1")).parse().unwrap();
@@ -64,18 +55,6 @@ pub fn main() {
 
             (GET) (/login) => {
                 let cookies = parse_cookies(request);
-                
-                let mut key_is_defined = true;
-
-                let key = env::var("key").unwrap_or_else(|_| {
-                    key_is_defined = false;
-                    return "".to_string();
-                });
-
-                
-                if !key_is_defined {
-                    return rouille::Response::html("<h1>Login key not defined</h1> <p>Execute /login on discord to get a key</p>");
-                }
 
                 if let Some(auth_token) = cookies.get("token") {
                     if auth_token == &key {
@@ -85,15 +64,27 @@ pub fn main() {
                 }
 
                 return rouille::Response::html(
-                    "<input id=\"token\" placeholder=\"token\">
-                    <button onclick=\"login()\">login</button>
+                    "
+                    <head>
+                        <link rel=\"stylesheet\" href=\"https://unpkg.com/@picocss/pico@latest/css/pico.min.css\" />
 
+                        <style>
+                            body {
+                                padding: 2em;
+                            }
+                        </style>
+                    </head>
+                    <body>
+                        <label>Enter access token. You can retrieve it by running /login</label>
+                        <input id=\"token\" placeholder=\"Token\">
+                        <button onclick=\"login()\">login</button>
+                    </body>
                 
                     <script>
                         function login() {
                             const token = document.getElementById('token').value;
 
-                            document.cookie = `token=${token}; max-age=60`;
+                            document.cookie = `token=${token}`;
                             window.location.reload();
                         }
                     </script>
@@ -128,17 +119,23 @@ async fn retrieve_data_from_db(page: u64, user_id: Option<&str>, status: Option<
 
 fn construct_results(data: Vec<DatabaseTarget>) -> String {
     let mut html_string: String = String::from("");
+    let usernames = executor::block_on(database::get_usernames(data.iter().map(|s| s.user_id).collect()));
+
 
     for result in data.iter() {
+        let target_username = usernames.get(&result.user_id).unwrap();
+        let time: i64 = result.time.try_into().unwrap();
+
+        let readable_time = DateTime::from_timestamp(time,0).unwrap().format("%d/%m/%Y @ %H:%M:%S");
+
         html_string += format!("
-        <div class={}>
-            <p>{}</p>
-            <p>{}</p>
-            <p>{}</p>
-            <p>{}</p>
-            <p>{}</p>
-        </div>
-      ", result.status, result.time, result.user_id, result.status, result.activity, result.activity_description)
+        <article class=\"status {}\">
+            <h3><span data-userid=\"{}\"  class=\"mention\">{}</span></h3>
+            <h4>{}</h4>
+            <hr>
+            <h5>{} - {}</h5>
+        </article>
+      ", result.status, result.user_id, target_username, format!("{}", readable_time), result.activity, result.activity_description)
             .as_str();
     }
 
@@ -147,129 +144,267 @@ fn construct_results(data: Vec<DatabaseTarget>) -> String {
 
 fn construct_page(data: Vec<DatabaseTarget>, page: u64, max_pages: u64) -> String {
     let html = format!(
-    "<style>
+    "
+<html>
+<head>
+    <link rel=\"stylesheet\" href=\"https://unpkg.com/@picocss/pico@latest/css/pico.min.css\" />
+
+    <style>
+    :root {{
+    --pico-font-family-sans-serif: Inter, system-ui, \"Segoe UI\", Roboto, Oxygen, Ubuntu, Cantarell, Helvetica, Arial, \"Helvetica Neue\", sans-serif, var(--pico-font-family-emoji);
+    --pico-font-size: 87.5%;
+    /* Original: 100% */
+    --pico-line-height: 1.25;
+    /* Original: 1.5 */
+    --pico-form-element-spacing-vertical: 0.5rem;
+    /* Original: 1rem */
+    --pico-form-element-spacing-horizontal: 1.0rem;
+    /* Original: 1.25rem */
+    --pico-border-radius: 0.375rem;
+    /* Original: 0.25rem */
+}}
+
+@media (min-width: 576px) {{
+    :root {{
+        --pico-font-size: 87.5%;
+        /* Original: 106.25% */
+    }}
+}}
+
+@media (min-width: 768px) {{
+    :root {{
+        --pico-font-size: 87.5%;
+        /* Original: 112.5% */
+    }}
+}}
+
+@media (min-width: 1024px) {{
+    :root {{
+        --pico-font-size: 87.5%;
+        /* Original: 118.75% */
+    }}
+}}
+
+@media (min-width: 1280px) {{
+    :root {{
+        --pico-font-size: 87.5%;
+        /* Original: 125% */
+    }}
+}}
+
+@media (min-width: 1536px) {{
+    :root {{
+        --pico-font-size: 87.5%;
+        /* Original: 131.25% */
+    }}
+}}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {{
+    --pico-font-weight: 600;
+    /* Original: 700 */
+}}
+
+article {{
+    border: 1px solid var(--pico-muted-border-color);
+    /* Original doesn't have a border */
+    border-radius: calc(var(--pico-border-radius) * 2);
+    /* Original: var(--pico-border-radius) */
+}}
+
+article>footer {{
+    border-radius: calc(var(--pico-border-radius) * 2);
+    /* Original: var(--pico-border-radius) */
+}}
+
+        body {{
+            padding: 2em;
+        }}
+
         .navigation {{
-        display: flex;
-        align-items: center;
-    }}
-    
-    .navigation * {{
-        width: fit-content;
-        height: fit-content;
-        margin: 0.5em;
-    }}
+            display: flex;
+            align-items: center;
+        }}
 
-    .navigation input {{
-        width: 8ch;
-    }}
-    
-    .statuses div {{
-        background-color: gray;
-        min-width: 50vw;
-        width: fit-content;
-        margin-bottom: 12px;
-    }}
+        .filters {{
+            display: flex;
+            justify-content: center;
+            flex-direction: column;
+        }}
 
-    .online {{
-        background-color: green !important;
-    }}
-      
-    .offline {{
-       background-color: gray !important;
-    }}
-  
-    .dnd {{
-      background-color: red !important;
-    }}
-  
-    .idle {{
-      background-color: orange !important;
-    }}
-  </style>
-  
-  <body>
+        .horizontal {{
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-direction: row;
+        }}
+
+        .filters input {{}}
+
+        .navigation * {{
+            width: fit-content;
+            height: fit-content;
+            align-items: center;
+        }}
+
+        .navigation button {{
+            margin: 1em;
+        }}
+
+        .statuses div {{
+            min-width: 50vw;
+            width: fit-content;
+            margin-bottom: 12px;
+        }}
+
+        #pages * {{
+            height: 1em;
+        }}
+
+        .status {{
+            border: solid 0px;
+            border-left-width: 10px !important;
+        }}
+
+        .online {{
+            border-color: rgb(40, 219, 37) !important;
+        }}
+
+        .idle {{
+            border-color: rgb(219, 157, 24) !important;
+        }}
+
+        .dnd {{
+            border-color: rgb(230, 54, 41) !important;
+        }}
+
+        .offline {{
+            border-color: rgb(53, 56, 59) !important;
+        }}
+
+        
+        .mention {{
+            background-color: #3e4270;
+            padding: 6px;
+            border-radius: 4px;
+        }}
+        
+        .mention::before {{
+            content: \"@\";
+        }}
+
+        
+    </style>
+
+</head>
+
+<body>
     <h1>Status</h1>
     <div class=\"filters\">
-      <input id=\"id\" placeholder=\"user id\">
-      <input id=\"activity\" placeholder=\"activity (e.g spotify)\">
-      <input id=\"status\" placeholder=\"status (e.g online)\">
-      <input id=\"before\" type=\"date\" placeholder=\"before (e.g 1745738385)\">
-      <input id=\"after\" type=\"date\"  placeholder=\"after (e.g 1745738385\">
-      <button onclick=\"handleFilterApply();\">apply</button>
+        <p>Filters</p>
+        <div class=\"horizontal-filters\">
+            <input id=\"id\" placeholder=\"User ID\">
+            <input id=\"activity\" placeholder=\"Activity (e.g Spotify)\">
+            <label>Status</label>
+            <select id=\"status\">
+                <option value=\"\" selected>Any</option>
+                <option value=\"online\">Online</option>
+                <option value=\"dnd\">Do not disturb</option>
+                <option value=\"idle\">Idle</option>
+                <option value=\"offline\">Offline</option>
+            </select>
+        </div>
+        <div class=\"horizontal-filters\">
+            <div>
+                <label>Before:</label>
+                <input id=\"before\" type=\"date\" placeholder=\"before (e.g 1745738385)\">
+            </div>
+            <div>
+                <label>After:</label>
+                <input id=\"after\" type=\"date\" placeholder=\"after (e.g 1745738385\">
+            </div>
+        </div>
     </div>
-    <div class=\"navigation\">
-      <button onclick=\"handleNavigation(-1)\">previous page</button>
-      <input value={page}>
-      <p id=\"pagenum\">/{max_pages}</p>
-      <button onclick=\"handleNavigation(1)\">next page</button>
+    <button onclick=\"handleFilterApply();\">Apply</button>
+
+    <hr>
     </div>
-    <div class=\"statuses\">  
+
+    <div class=\"statuses\">
         {}
     </div>
-  </body>
-      
-  <script>
-    const userId = document.getElementById('id');
-    const activity = document.getElementById('activity');
-    const status = document.getElementById('status');
 
-    userId.value = getCookieByName('userId');
-    activity.value = getCookieByName('activity');
-    status.value = getCookieByName('status');
+    <div class=\"navigation horizontal\">
+        <button class=\"outline\" onclick=\"handleNavigation(-1)\">Previous page</button>
+        <div id=\"pages\" class=\"horizontal\">
+            <p id=\"selected-page\">{page}</p>
+            <p id=\"max-pages\">/{max_pages}</p>
+        </div>
+        <button class=\"outline\" onclick=\"handleNavigation(1)\">Next page</button>
+    </div>
 
-    document.cookie=`token=no;expires=Thu, 01 Jan 1970 00:00:01 GMT`;
+    <script>
+        const userId = document.getElementById('id');
+        const activity = document.getElementById('activity');
+        const status = document.getElementById('status');
+        userId.value = getCookieByName('userId');
+        activity.value = getCookieByName('activity');
+        status.value = getCookieByName('status');
+        document.cookie = \"token=no;expires=Thu, 01 Jan 1970 00:00:01 GMT\";
 
-    function getCookieByName(name) {{
-        const cookies = document.cookie.split(';');
-        for (let cookie of cookies) {{
-            cookie = cookie.trim();
-            if (cookie.startsWith(name + '=')) {{
-                return cookie.substring(name.length + 1);
+        function getCookieByName(name) {{
+            const cookies = document.cookie.split(';');
+            for (let cookie of cookies) {{
+                cookie = cookie.trim();
+                if (cookie.startsWith(name + '=')) {{
+                    return cookie.substring(name.length + 1);
+                }}
             }}
-        }}
-        return null;
-    }}
-
-    function eraseCookie(name) {{
-        document.cookie = name + '=; Max-Age=0'
-    }}
-
-
-    function handleNavigation(direction) {{
-        let currentPage = Number(getCookieByName(\"page\"));
-        currentPage += direction;
-
-        if(currentPage <= 0) {{
-            return;
+            return null;
         }}
 
-        document.cookie = `page=${{currentPage}}`;
-        window.location.reload();
-    }}
-
-    function handleFilterApply(a) {{        
-        if(activity.value) {{
-            document.cookie = `activity=${{activity.value}}`;
-        }} else {{
-            eraseCookie(\"activity\");
+        function eraseCookie(name) {{
+            document.cookie = name + '=; Max-Age=0'
         }}
 
-        if(userId.value) {{
-            document.cookie = `userId=${{userId.value}}`;
-        }} else {{
-            eraseCookie(\"userId\");
+        function handleNavigation(direction) {{
+            let currentPage = Number(getCookieByName(\"page\"));
+            currentPage += direction;
+            if (currentPage <= 0) {{
+                return;
+            }}
+            document.cookie = \"page=\" + currentPage;
+            window.location.reload();
         }}
 
-        if(status.value) {{
-            document.cookie = `status=${{status.value}}`;
-        }} else {{
-            eraseCookie(\"status\");
+        function handleFilterApply(a) {{
+            if (activity.value) {{
+                document.cookie = \"activity=\" + activity.value;
+            }} else {{
+                eraseCookie(\"activity\");
+            }}
+            if (userId.value) {{
+                document.cookie = \"userId=\" + userId.value;
+            }} else {{
+                eraseCookie(\"userId\");
+            }}
+            if (status.value) {{
+                document.cookie = \"status=\" + status.value;
+            }} else {{
+                eraseCookie(\"status\");
+            }}
+            console.log(\"id=\" + userId.value + \"; activity=\" + activity.value + \"; status=\" + status.value);
+            window.location.reload();
         }}
+    </script>
+</body>
 
-        console.log(`id=${{userId.value}}; activity=${{activity.value}}; status=${{status.value}}`);
-        window.location.reload();
-    }}
-  </script>", construct_results(data));
+</html>
+", construct_results(data));
 
   return html;
 }
