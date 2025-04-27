@@ -16,6 +16,45 @@ pub fn new_write_queue(buffer: usize) -> (Sender<WriteJob>, Receiver<WriteJob>) 
     channel(buffer)
 }
 
+pub async fn get_data(page: &u64, user_id: Option<&str>, status: Option<&str>, activity: Option<&str>, activity_description: Option<&str>, time_lt: Option<&u64>, time_mt: Option<&u64>) -> libsql::Rows {
+    let db = Builder::new_local("data.db").build().await.unwrap();
+    let conn = db.connect().unwrap();
+    let page_content_amount = 15;
+    let min_id = (page -1) * ((page-1)*page_content_amount);
+    
+    let mut base_query = format!("SELECT * FROM tracking_data WHERE id IS NOT NULL");
+
+    if let Some(user_id) = user_id {
+        base_query += &format!(" AND user_id = {user_id}");
+    }
+    
+    if let Some(status) = status {
+        base_query += &format!(" AND status = '{status}'");
+    }
+
+    if let Some(activity) = activity {
+        base_query += &format!(" AND activity = '{activity}'");
+    }
+
+    if let Some(activity_description ) = activity_description {
+        base_query += &format!(" AND activity_description = '{activity_description}'");
+    }
+
+    if let Some(time_lt) = time_lt {
+        base_query += &format!(" AND time < {time_lt}");
+    }
+
+    if let Some(time_mt) = time_mt {
+        base_query += &format!(" AND time < {time_mt}");
+    }
+
+    base_query += &format!(" LIMIT {page_content_amount} OFFSET {min_id}");
+
+    println!("Executing query {base_query}");
+
+    return conn.query(&base_query, ()).await.unwrap();
+}
+
 pub async fn writer_task(mut rx: Receiver<WriteJob>) {
     let db = Builder::new_local("data.db").build().await.unwrap();
     let conn = db.connect().unwrap();

@@ -1,4 +1,5 @@
 mod database;
+mod webserver;
 
 use std::env;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -8,6 +9,8 @@ use poise::serenity_prelude as serenity;
 use poise::serenity_prelude::*;
 use std::sync::Arc;
 use tokio::sync::mpsc::Sender;
+use rand::{distr::Alphanumeric, Rng};
+use std::thread;
 
 struct Data {}
 
@@ -22,19 +25,19 @@ type Context<'a> = poise::Context<'a, Data, Error>;
 #[serenity::async_trait]
 impl EventHandler for Handler {
     async fn ready(&self, _ctx: serenity::Context, ready: Ready) {
-        info!("Bot logged in to {}", ready.user.name);
+        println!("Bot logged in to {}", ready.user.name);
     }
 
     async fn guild_create(&self, _ctx: serenity::Context, guild: Guild, _is_new: Option<bool>) {
-        info!("Guild {} registered", guild.name);
+        println!("Guild {} registered", guild.name);
     }
 
     async fn presence_update(&self, _ctx: serenity::Context, new_data: Presence) {
         if !new_data.guild_id.unwrap().get().to_string().eq(&env::var("SCAN_GUILD").unwrap()) {
-            info!("Ignoring status update.");
+            println!("Ignoring status update.");
         }
 
-        info!("Presence update for {} arrived", new_data.user.name.unwrap());
+        println!("Presence update for {} arrived", new_data.user.name.unwrap());
         
         let activity = new_data
             .activities
@@ -67,6 +70,28 @@ async fn ping(ctx: Context<'_>) -> Result<(), Error> {
     Ok(())
 }
 
+#[poise::command(slash_command, prefix_command, ephemeral)]
+async fn login(ctx: Context<'_>) -> Result<(), Error> {
+    if format!("{}",ctx.author().id.get()) != env::var("ADMIN_ID").expect("Admin id not configured") {
+        ctx.say("You have to be admin to run this command.").await?;
+        return Ok(())
+    }
+
+    let key: String = rand::rng()
+        .sample_iter(&Alphanumeric)
+        .take(16)
+        .map(char::from)
+        .collect();
+
+    unsafe {
+        env::set_var("key", &key);
+    }
+    
+    ctx.say(format!("{}", &key)).await?;
+
+    Ok(())
+}
+
 #[tokio::main]
 async fn main() {
     dotenv().ok();
@@ -84,7 +109,7 @@ async fn main() {
 
     let framework = poise::Framework::builder()
         .options(poise::FrameworkOptions {
-            commands: vec![ping()],
+            commands: vec![ping(), login()],
             ..Default::default()
         })
         .setup(|ctx, _ready, framework| {
@@ -95,6 +120,7 @@ async fn main() {
         })
         .build(); 
 
+    thread::spawn(||webserver::main());
 
     let client = ClientBuilder::new(token,intents)
         .event_handler(handler)
